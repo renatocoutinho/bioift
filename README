@@ -1,0 +1,16 @@
+These are a collection of small (and some not so small) programs written and
+used by the Mathematical Biology group at the Institute for Theoretical Physics
+(Instituto de Física Teórica, IFT) of State University of Sao Paulo (Unesp).
+The group is headed by Prof. Dr. Roberto Kraenkel <kraenkel@ift.unesp.br>.
+
+They are written mainly in python, usually with numpy/scipy and matplotlib for
+plotting, but also with sympy and fipy sometimes. There may also be some C and
+Fortran programs eventually.
+
+More about the group and its members can be found at:
+
+http://bioift.wordpress.com/
+
+This repository is maintained by me, Renato Coutinho, you can send any
+questions or bugs (even though there are NO bugs ;) to
+renato.coutinho@gmail.com.
