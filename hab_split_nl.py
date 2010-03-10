@@ -1,28 +1,28 @@
 # -*- coding: utf-8 -*-
 from __future__ import division
-from numpy import array, arange, vectorize, sqrt, cosh, sinh, tanh, exp, poly1d, isnan, nan, linspace, logspace, log, log10
+from numpy import array, arange, vectorize, sqrt, cosh, sinh, tanh, exp, poly1d, isnan, nan, linspace, logspace, log, log10, arccosh
 from scipy.integrate import quad
 from scipy.optimize import fsolve, brentq
 
 p = {
-        'a': 1.1,
-        'b': 0.,
-        't1': 2.,
-        't2': 2.,
-        'mJ': 0.1,
-        'mA': 0.001,
-        'DJ': 1.,
-        'DA': 1.,
-        'd': 100,
-        'L1': 1.,
-        'g': 0.1
+        'a': 2.,        # \alpha
+        'b': 0.,        # \beta
+        't1': 2.,       # t_1
+        't2': 2.,       # t_2
+        'mJ': 1.,       # \mu_J
+        'mA': 0.001,    # \mu_A
+        'DJ': 1.,       # D_J
+        'DA': 1.,       # D_A
+        'd': 1,         # d := L_2 - L_1
+        'L1': 1.,       # L_1
+        'g': 1.         # \gamma
     }
 
 
 cubic_root = lambda x: x**(1/3) if x > 0 else -(-x)**(1/3)
 
 def f(k, p=p):
-    return p['d'] - quad(g, A2(k), r(p)*k, args=(A2(k),p))[0]
+    return p['d'] - quad(g, A2(k), r(p)*k, args=(A2(k),p), limit=1000)[0]
 
 def g(x, A2, p=p):
     return 1/sqrt( (p['mA']*(-A2**2 + x**2) + 2*p['g']/3*(-A2**3 + x**3)) / p['DA'] )
@@ -71,7 +71,7 @@ def A(x, k, p=p, check=False):
         c2 = k*(1-p['b'] - p['a']*exp(+wJ*p['L1']))/2/wJ/sinh(wJ*p['L1'])
         return c1 * exp(wJ*x) + c2 * exp(-wJ*x)
     else:
-        return brentq(lambda y: p['L1'] + p['d'] - x - quad(g, A2(k), y, args=(A2(k),p))[0],
+        return brentq(lambda y: p['L1'] + p['d'] - x - quad(g, A2(k), y, args=(A2(k),p), limit=1000)[0],
                 A2(k)+1e-9, r(p)*k)
 
 def solution(k, p=p, npoints=200, extra_par={}):
@@ -117,7 +117,7 @@ def find_k(k0=None, p=p, extra_par={}):
     p.update(old_p)
     return k
 
-def varia_p(param, values, p=p):
+def varia_p(param, values, p=p, out=['k']):
     orig = p[param]
     result = []
     for x in values:
@@ -128,7 +128,21 @@ def varia_p(param, values, p=p):
         except AssertionError:
             result.append(nan)
         else:
-            result.append(k)
+            item = []
+            if 'k' in out:
+                item.append(k)
+            if 'solution' in out:
+                item.append(solution(k, p))
+            if 'A1' in out:
+                item.append(r(p)*k)
+            if 'A2' in out:
+                item.append(A2(k, p))
+            
+            if len(item) == 1:
+                result.append(item[0])
+            else:
+                result.append(item)
+
     p[param] = orig
-    return array(result)
+    return result
 
