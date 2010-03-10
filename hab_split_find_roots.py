@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
-from sympy.mpmath import *
+#from sympy.mpmath import *
+import sympy.mpmath as mp
 #from numpy import *
 from numpy import arange, array, vectorize, zeros, where, abs, concatenate, transpose
-from pylab import plot as pyplot, xlabel, ylabel, legend, scatter, show
+from pylab import plot, xlabel, ylabel, legend, scatter, show
 from scipy.stats._support import unique
-#from scipy import optimize as op
+from scipy import optimize as op
 from itertools import product as iproduct
 import multiprocessing
 
@@ -29,34 +30,28 @@ maxx = 10.
 miny = -0.02
 maxy = 10.
 
-# work around for lack of numpy coth
-try:
-    coth
-except NameError:
-    coth = lambda x: 1./tanh(x)
-
-def f(x, p=p):
-    return (1 - p['b'] * exp(-x * p['t2'])) * exp(x * p['t1']) \
-            * (cosh(sqrt((p['mJ'] + x)/p['DJ']) * p['L1']) \
-            - sinh(sqrt((p['mJ'] + x)/p['DJ']) * p['L1']) \
-            * sqrt((p['mJ'] + x)/p['DJ']) / sqrt((p['mA'] + x)/p['DA']) \
-            * coth(sqrt((p['mA'] + x)/p['DA']) * p['d'])) - p['a']
+def F(x, p=p):
+    return (1 - p['b'] * mp.exp(-x * p['t2'])) * mp.exp(x * p['t1']) \
+            * (mp.cosh(mp.sqrt((p['mJ'] + x)/p['DJ']) * p['L1']) \
+            + mp.sinh(mp.sqrt((p['mJ'] + x)/p['DJ']) * p['L1']) \
+            * mp.sqrt((p['mJ'] + x)/p['DJ']) / mp.sqrt((p['mA'] + x)/p['DA']) \
+            * mp.coth(mp.sqrt((p['mA'] + x)/p['DA']) * p['d'])) - p['a']
 
 # identical to above, to be used in multprocessing. The function must be pickle-friendly.
 def fmult(x, p=p):
-    return ( x[0], x[1], f(x[0] + 1j*x[1], p=p) )
+    return ( x[0], x[1], F(x[0] + 1j*x[1], p=p) )
 
 def M(x, l, p=p):
-    return exp(sqrt((p['mJ'] + l)/p['DJ']) * x) + \
-            ((1 - p['b'] * exp(-x * p['t2'])) * exp(x * p['t1']) - p['a'] * exp(sqrt((p['mJ'] + l)/p['DJ']) * p['L1'])) / \
-            ((1 - p['b'] * exp(-x * p['t2'])) * exp(x * p['t1']) - p['a'] * exp(- sqrt((p['mJ'] + l)/p['DJ']) * p['L1'])) \
-            * exp(- sqrt((p['mJ'] + l)/p['DJ']) * x)
+    return mp.exp(mp.sqrt((p['mJ'] + l)/p['DJ']) * x) + \
+            ((1 - p['b'] * mp.exp(-x * p['t2'])) * mp.exp(x * p['t1']) - p['a'] * mp.exp(mp.sqrt((p['mJ'] + l)/p['DJ']) * p['L1'])) / \
+            ((1 - p['b'] * mp.exp(-x * p['t2'])) * mp.exp(x * p['t1']) - p['a'] * mp.exp(- mp.sqrt((p['mJ'] + l)/p['DJ']) * p['L1'])) \
+            * mp.exp(- mp.sqrt((p['mJ'] + l)/p['DJ']) * x)
 
 def N(x, l, p=p):
     '''Incomplete!!'''
-    return 2. * sinh(sqrt((p['mJ'] + l)/p['DJ']) * p['L1']) \
-            * (exp(sqrt((p['mA'] + l)/p['DA']) * x) + \
-            exp(sqrt((p['mA'] + l)/p['DA']) * (2*p['L2'] - x)))
+    return 2. * mp.sinh(sqrt((p['mJ'] + l)/p['DJ']) * p['L1']) \
+            * (mp.exp(mp.sqrt((p['mA'] + l)/p['DA']) * x) + \
+            mp.exp(mp.sqrt((p['mA'] + l)/p['DA']) * (2*p['L2'] - x)))
 
 def mp_real(x):
     return vectorize(lambda y: y.real)(x)
@@ -72,17 +67,17 @@ def mp_to_float(x):
             else:
                 raise ValueError
         else:
-            return mpf(y)
+            return mp.mpf(y)
 
     return vectorize(get_real)(x)
 
 def mp_solve(f, p, x0=0.01, limits=None, method='muller'):
     if not limits:
-        return findroot(lambda x: f(x, p=p), x0, solver=method)
+        return mp.findroot(lambda x: f(x, p=p), x0, solver=method)
     else:
         if method == 'muller':
             method = 'anderson'
-        return findroot(lambda x: f(x, p=p), limits, solver=method)
+        return mp.findroot(lambda x: f(x, p=p), limits, solver=method)
 
 def solve(f, p, x0=0.01, limits=[1e-12, 5.], method='fsolve'):
     if method == 'brentq':
@@ -111,7 +106,7 @@ def make_grid(scale, minx, maxx, miny, maxy, mult=True):
 
         return rr
     else:
-        return array([ [ f(i + j*1j) for j in gridy ] for i in gridx ])
+        return array([ [ F(i + j*1j) for j in gridy ] for i in gridx ])
 
 def roots_plot(r, part='real', scale=0.05, offset=10.):
     if part == 'real':
@@ -181,7 +176,7 @@ def mp_uniq(seq, tol=1e-16):
 def c_plot(x, *args, **kwargs):
     as_ri = lambda y: [ y.real, y.imag if type(y) == mpc else 0 ]
     z = array([ as_ri(y) for y in x ])
-    return pyplot(z[:,0], z[:,1], *args, **kwargs)
+    return plot(z[:,0], z[:,1], *args, **kwargs)
 
 def get_root_seq(f, p, x0, params, methods=['secant']):
     param = params[0]
@@ -218,10 +213,21 @@ def get_all_roots_seq(f, p, x0, params, limits=[0., 20.], scale=5*1e-3, methods=
     p[param] = ps[0]
     return [ array([ps]), transpose(array(resultr)), array(resultc) ]
 
+def zero_stable(f, p, extra_par={}, limits=[-0., 30.], res=1e-2):
+    old_p = p.copy()
+    p.update(extra_par)
+    x = arange(limits[0], limits[1], res)
+    v = vectorize(lambda y: f(y, p=p))(x)
+    p.update(old_p)
+    return v.max() * v.min() > 0
+
+def find_bif(f=F, p=p, par='L1', plimits=[0.06, 0.07], res=1e-3, limits=[0., 1.]):
+    return op.bisect(lambda y: -0.5 + int(zero_stable(F, p, extra_par={par: y}, limits=limits, res=res)), plimits[0], plimits[1], xtol=res)
+
 def go():
     r = make_grid(scale, minx, maxx, miny, maxy)
     tr = trace_roots(r)
     guesses = tr[0][:,0]*scale + minx + 1j*tr[0][:,1]*scale + miny
-    roots = get_roots(f, p, guesses)
+    roots = get_roots(F, p, guesses)
     return (r, tr, guesses, roots)
 
