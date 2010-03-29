@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-from numpy import array, arange, vectorize
+from numpy import array, arange, vectorize, where
 #from numpy import exp, cosh, sinh, tanh, sqrt
-from sympy import exp, cosh, sinh, tanh, sqrt
+from sympy.mpmath import exp, cosh, sinh, tanh, sqrt, mpf, mpc
 from pylab import plot, show, legend, xlabel, ylabel
 import sympy.mpmath as mp
 
@@ -18,7 +18,7 @@ p = {
     }
 
 def G(l, p=p, extra_par={}):
-    old_p = p
+    old_p = p.copy()
     p.update(extra_par)
     wJ = sqrt((p['mJ'] + l)/p['DJ'])
     wA = sqrt((p['mA'] + l)/p['DA'])
@@ -27,7 +27,7 @@ def G(l, p=p, extra_par={}):
     return result
 
 def J(x, p=p, extra_par={}):
-    old_p = p
+    old_p = p.copy()
     p.update(extra_par)
     assert x >= 0
     assert x <= p['L1']
@@ -41,7 +41,7 @@ def J(x, p=p, extra_par={}):
     return result
 
 def A(x, p=p, extra_par={}):
-    old_p = p
+    old_p = p.copy()
     p.update(extra_par)
     assert x >= p['L1']
     assert x <= p['L1'] + p['d']
@@ -69,39 +69,68 @@ def check_consistency(p=p, extra_par={}):
     assert p['K']/p['r'] * (cosh(wJ*p['L1']) + wA/wJ * tanh(wA*p['d']) * sinh(wJ*p['L1'])) <= 1.
     p.update(old_p)
 
+def consistency_condition(par='L1', p=p, extra_par={}):
+    old_p = p.copy()
+    p.update(extra_par)
+    check_consistency(p=p)
+    g = lambda x: G(0, p=p, extra_par={par: x}) - p['r']/p['K']
+    result = mp.findroot(g, p[par], solver='secant')
+    p.update(old_p)
+    return result
+
 def mp_real(x):
     return vectorize(lambda y: y.real)(x)
 
 def mp_imag(x):
     return vectorize(lambda y: y.imag)(x)
 
-def mp_to_float(x):
-    def get_real(y):
-        if type(y) == mpc:
-            if y.imag == mpf(0):
-                return y.real
-            else:
-                raise ValueError
+def mp_real(x):
+    if type(x) == mpc:
+        if x.imag == mpf(0):
+            return mpf(x.real)
         else:
-            return mp.mpf(y)
+            raise ValueError
+    else:
+        return mpf(x)
 
-    return vectorize(get_real)(x)
+def mp_to_float(x):
+    return vectorize(mp_real)(x)
 
-def mp_solve(f, p, x0=0.01, limits=None, method='muller'):
+def mp_solve(f, x0=0.01, limits=None, method='muller'):
     if not limits:
-        return mp.findroot(lambda x: f(x, p=p), x0, solver=method)
+        return mp.findroot(f, x0, solver=method)
     else:
         if method == 'muller':
             method = 'anderson'
-        return mp.findroot(lambda x: f(x, p=p), limits, solver=method)
+        return mp.findroot(f, limits, solver=method)
 
-def get_real_roots(f, p, limits=[-0., 20.], scale=1e-2, method='anderson'):
+def get_real_roots(f, limits=[-4., 4.], scale=1e-2, method='anderson'):
     x = arange(limits[0], limits[1], scale)
-    v = mp_to_float(vectorize(f)(x))
+    g = lambda x: f(x)
+    v = vectorize(g)(x)
     r = []
     for i in where(v[1:] * v[:-1] < 0)[0]:
-        r.append(mp_solve(f, p, limits=[x[i], x[i+1]], method=method))
+        try:
+            s = mp_solve(g, limits=[x[i], x[i+1]], method=method)
+        except ValueError:
+            s = None
+        else:
+            r.append(s)
     return array(r)
+
+def ffp(x, p=p, extra_par={}):
+    old_p = p.copy()
+    p.update(extra_par)
+    result = mp_real(G(x, p=p) - p['K'] / p['r'] * G(0, p=p)**2)
+    p.update(old_p)
+    return result
+
+def f0(x, p=p, extra_par={}):
+    old_p = p.copy()
+    p.update(extra_par)
+    result = mp_real(G(x, p=p) - p['r'] / p['K'])
+    p.update(old_p)
+    return result
 
 if __name__ == '__main__':
     check_consistency()
