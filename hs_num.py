@@ -1,26 +1,24 @@
 # -*- coding: utf-8 -*-
-"""integra a equação de fisher-kolmogorov (fkpp) em uma dimensão
+"""Integrates a parabolic PDE with non-homogeneous coefficients and delayed boundary conditions.
 
-u_t = Du_{xx} + ru(1-u/K) em um dománio finito com condições do tipo Dirichlet
-( no caso, a funcao incógnita é nula na borda) adaptado de
-http://www.maths.uq.edu.au/courses/MATH3203/assignment1.pdf (Dion Weatherley) 
-a condição inicial é um meio período e um seno.
+The equation 
+    u_t = D(x) u_{xx} - \mu(x) u
+with boundary conditions
+    -> J_x|_{x=L_2} = 0
+    -> J|_{x=0} = rJ(t-t_1)|_{x=L_1}/(K+rJ(t-t_1)|_{x=L_1})
+and 
+    D = D_J, for x \in [0, L_1] or
+        D_A for x in [L_1, L_2]
+    \mu = \mu_J, for x \in [0, L_1] or
+          \mu_A for x in [L_1, L_2]
+
+models habitat split in a population of amphibians.
+
+We use as initial condition a decaying exponential of small amplitude.
 """
 from numpy import *
 from scipy.interpolate import KroghInterpolator
 from pylab import plot, show, legend, xlabel, ylabel, ion, draw, figure, ylim
-
-p = {
-        'r': 2.,        # r
-        't1': 0.01,       # t_1
-        'mJ': 1.,       # \mu_J
-        'mA': 0.001,    # \mu_A
-        'DJ': 1.,       # D_J
-        'DA': 1.,       # D_A
-        'd': 1,         # d := L_2 - L_1
-        'L1': 1.,       # L_1
-        'K': 1.         # K
-        }
 
 class PDE_sapos():
     def __init__(self, **kwargs):
@@ -122,4 +120,17 @@ def PDE_sapos_integrate(p, T, mesh_size=100, view=False):
     return s
 
 if __name__ == '__main__':
+    p = {
+        'r': 2.,        # r
+        't1': 0.01,       # t_1
+        'mJ': 1.,       # \mu_J
+        'mA': 0.001,    # \mu_A
+        'DJ': 1.,       # D_J
+        'DA': 1.,       # D_A
+        'd': 1,         # d := L_2 - L_1
+        'L1': 1.,       # L_1
+        'K': 1.         # K
+        }
+
+
     s = PDE_sapos_integrate(p, 0.5, 100, view=True)
