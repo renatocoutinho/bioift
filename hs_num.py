@@ -13,8 +13,6 @@ and
           \mu_A for x in [L_1, L_2]
 
 models habitat split in a population of amphibians.
-
-We use as initial condition a decaying exponential of small amplitude.
 """
 from numpy import *
 from scipy.interpolate import KroghInterpolator
@@ -84,7 +82,7 @@ class PDE_sapos():
         #U_new[0] = 1. # constant
         #U_new[0] = self.r * U_new[self.jump] / (self.K + self.r*U_new[self.jump]) # no delay
         A1 = self._past_value(t - self.t1, dt, self.jump)
-        U_new[0] = self.r * A1 / (self.K + A1) # full
+        U_new[0] = self.r * A1 / (self.K + self.r * A1) # full
         U_new[-1] = U_new[-2]
 
         return U_new
@@ -102,11 +100,15 @@ class PDE_sapos():
             #fig = figure(figsize=(12,8), dpi=100)
             #ax = fig.add_axes()
             line, = plot(self.grid, self.data[-1])
-            ylim(0, 2.)
+            ylim(-0.1, 1.)
+            xlabel('x')
+            ylabel('J')
+            plot([0, self.L2], [0, 0], 'k')
+            plot([self.L1, self.L1], [-0.1, 1.2], '--k')
 
         for t in arange(dt, T, dt):
             self.data.append(self._evolve(t, dt))
-            if view:
+            if view and int(t/dt) % 100 == 0:
                 line.set_ydata(self.data[-1])
                 draw()
 
@@ -114,7 +116,7 @@ class PDE_sapos():
 def PDE_sapos_integrate(p, T, mesh_size=100, view=False):
     s = PDE_sapos(**p)
     s.set_grid(100)
-    s.initialize(lambda x: 0.01*exp(-x))
+    s.initialize(vectorize(lambda x: 0.2))
     dt = 0.4 * s.dx**2
     s.integrate(T, dt, view=view)
     return s
@@ -133,4 +135,4 @@ if __name__ == '__main__':
         }
 
 
-    s = PDE_sapos_integrate(p, 0.5, 100, view=True)
+    s = PDE_sapos_integrate(p, 5., 100, view=True)
