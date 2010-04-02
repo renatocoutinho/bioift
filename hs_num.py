@@ -132,4 +132,4 @@ if __name__ == '__main__':
         }
 
 
-    s = PDE_sapos_integrate(p=p, T=10., y0=0.1, 100, view=True)
+    s = PDE_sapos_integrate(p=p, T=10., y0=0.1, mesh_size=100, view=True)
