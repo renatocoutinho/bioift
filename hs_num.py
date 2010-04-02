@@ -15,7 +15,7 @@ and
 models habitat split in a population of amphibians.
 """
 from numpy import *
-from scipy.interpolate import KroghInterpolator
+from scipy.interpolate import PiecewisePolynomial
 from pylab import plot, show, legend, xlabel, ylabel, ion, draw, figure, ylim
 
 class PDE_sapos():
@@ -53,7 +53,7 @@ class PDE_sapos():
             dt1 = self.D[xi] * deriv2_1 - self.m[xi] * self.data[t1][xi]
             
             # find interpolator
-            kip = KroghInterpolator([t0, t0, t1, t1], [self.data[t0][xi], dt0, self.data[t1][xi], dt1])
+            kip = PiecewisePolynomial([t0, t1], [[self.data[t0][xi], dt0], [self.data[t1][xi], dt1]])
             return kip(t)
 
     def set_grid(self, M):
@@ -113,10 +113,10 @@ class PDE_sapos():
                 draw()
 
 
-def PDE_sapos_integrate(p, T, mesh_size=100, view=False):
+def PDE_sapos_integrate(p, T, y0=0.2, mesh_size=100, view=False):
     s = PDE_sapos(**p)
     s.set_grid(100)
-    s.initialize(vectorize(lambda x: 0.2))
+    s.initialize(vectorize(lambda x: y0))
     dt = 0.4 * s.dx**2
     s.integrate(T, dt, view=view)
     return s
@@ -135,4 +135,4 @@ if __name__ == '__main__':
         }
 
 
-    s = PDE_sapos_integrate(p, 5., 100, view=True)
+    s = PDE_sapos_integrate(p, 5., 0.2, 100, view=True)
