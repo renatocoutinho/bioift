@@ -44,16 +44,15 @@ class PDE_sapos():
 
             # extreme points
             t0 = int(floor(t/dt))
-            t1 = int(ceil(t/dt))
 
             # derivatives at those points
             deriv2_0 = (self.data[t0][xi+1] - 2*self.data[t0][xi] + self.data[t0][xi-1]) / self.dx**2
             dt0 = self.D[xi] * deriv2_0 - self.m[xi] * self.data[t0][xi]
-            deriv2_1 = (self.data[t1][xi+1] - 2*self.data[t1][xi] + self.data[t1][xi-1]) / self.dx**2
-            dt1 = self.D[xi] * deriv2_1 - self.m[xi] * self.data[t1][xi]
+            deriv2_1 = (self.data[t0+1][xi+1] - 2*self.data[t0+1][xi] + self.data[t0+1][xi-1]) / self.dx**2
+            dt1 = self.D[xi] * deriv2_1 - self.m[xi] * self.data[t0+1][xi]
             
             # find interpolator
-            kip = PiecewisePolynomial([t0, t1], [[self.data[t0][xi], dt0], [self.data[t1][xi], dt1]])
+            kip = PiecewisePolynomial([t0*dt, (t0+1)*dt], [[self.data[t0][xi], dt0], [self.data[t0+1][xi], dt1]])
             return kip(t)
 
     def set_grid(self, M):
@@ -97,14 +96,12 @@ class PDE_sapos():
 
         if view:
             ion()
-            #fig = figure(figsize=(12,8), dpi=100)
-            #ax = fig.add_axes()
             line, = plot(self.grid, self.data[-1])
-            ylim(-0.1, 1.)
             xlabel('x')
             ylabel('J')
             plot([0, self.L2], [0, 0], 'k')
-            plot([self.L1, self.L1], [-0.1, 1.2], '--k')
+            plot([self.L1, self.L1], [-0.1, 1.], '--k')
+            ylim(-0.01, 0.3)
 
         for t in arange(dt, T, dt):
             self.data.append(self._evolve(t, dt))
@@ -124,7 +121,7 @@ def PDE_sapos_integrate(p, T, y0=0.2, mesh_size=100, view=False):
 if __name__ == '__main__':
     p = {
         'r': 2.,        # r
-        't1': 0.01,       # t_1
+        't1': 0.01,     # t_1
         'mJ': 1.,       # \mu_J
         'mA': 0.001,    # \mu_A
         'DJ': 1.,       # D_J
@@ -135,4 +132,4 @@ if __name__ == '__main__':
         }
 
 
-    s = PDE_sapos_integrate(p, 5., 0.2, 100, view=True)
+    s = PDE_sapos_integrate(p=p, T=10., y0=0.1, 100, view=True)
