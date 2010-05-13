@@ -4,17 +4,19 @@ from numpy import array, arange, vectorize, where
 from sympy.mpmath import exp, cosh, sinh, tanh, sqrt, mpf, mpc
 from pylab import plot, show, legend, xlabel, ylabel
 import sympy.mpmath as mp
+from scipy import integrate
 
 p = {
         'r': 2.,        # r
-        't1': 2.,       # t_1
+        't1': 1.,       # t_1
         'mJ': 1.,       # \mu_J
         'mA': 0.001,    # \mu_A
         'DJ': 1.,       # D_J
         'DA': 1.,       # D_A
-        'd': 1,         # d := L_2 - L_1
+        'd': 1.,        # d := L_2 - L_1
         'L1': 1.,       # L_1
-        'K': 1.         # K
+        'K': 1.,        # K
+        'a': 0          # \alpha := 1/h
     }
 
 def G(l, p=p, extra_par={}):
@@ -33,10 +35,12 @@ def J(x, p=p, extra_par={}):
     assert x <= p['L1']
     wJ = sqrt((p['mJ'])/p['DJ'])
     wA = sqrt((p['mA'])/p['DA'])
-    result = exp(wJ*(x-p['L1'])) / 2. * (1 - wA/wJ*tanh(wA*p['d'])) *\
-            (1/(cosh(wJ*p['L1']) + wA/wJ * tanh(wA*p['d']) * sinh(wJ*p['L1'])) -p['K']/p['r'])\
-            + exp(-wJ*(x-p['L1'])) / 2. * (1 + wA/wJ*tanh(wA*p['d'])) *\
-            (1/(cosh(wJ*p['L1']) + wA/wJ * tanh(wA*p['d']) * sinh(wJ*p['L1'])) -p['K']/p['r'])
+    result = p['K'] * exp(wJ*(x-p['L1'])) / 2. * (1 - wA/wJ*tanh(wA*p['d'])) *\
+            (1/(cosh(wJ*p['L1']) + wA/wJ * tanh(wA*p['d']) *\
+            sinh(wJ*p['L1'])) - 1./(p['r']*p['d']*exp(-p['a']*p['L1'])))\
+            + p['K'] * exp(-wJ*(x-p['L1'])) / 2. * (1 + wA/wJ*tanh(wA*p['d'])) *\
+            (1/(cosh(wJ*p['L1']) + wA/wJ * tanh(wA*p['d']) *\
+            sinh(wJ*p['L1'])) -1./(p['r']*p['d']*exp(-p['a']*p['L1'])))
     p.update(old_p)
     return result
 
@@ -48,7 +52,15 @@ def A(x, p=p, extra_par={}):
     wJ = sqrt((p['mJ'])/p['DJ'])
     wA = sqrt((p['mA'])/p['DA'])
     result = cosh(wA*(p['L1'] + p['d'] - x)) / cosh(wA*p['d']) *\
-            (1/(cosh(wJ*p['L1']) + wA/wJ * tanh(wA*p['d']) * sinh(wJ*p['L1'])) -p['K']/p['r'])
+            (1/(cosh(wJ*p['L1']) + wA/wJ * tanh(wA*p['d']) *\
+            sinh(wJ*p['L1'])) - 1./(p['r']*p['d']*exp(-p['a']*p['L1'])))
+    p.update(old_p)
+    return result
+
+def intA(p=p, extra_par={}):
+    old_p = p.copy()
+    p.update(extra_par)
+    result = integrate.quad(lambda y: A(y, p=p), p["L1"], p["L1"]+p["d"])
     p.update(old_p)
     return result
 
@@ -60,20 +72,28 @@ def sol(x, p=p, extra_par={}):
     else:
         return A(x, p, extra_par)
 
+def Lcrit(p=p, extra_par={}):
+    old_p = p.copy()
+    p.update(extra_par)
+    f = lambda y: G(0, p=p, extra_par={'L1': y}) - p['r']
+    result = mp_solve(f, limits=[0., 10.])
+    p.update(old_p)
+    return result
+
 def check_consistency(p=p, extra_par={}):
     old_p = p.copy()
     p.update(extra_par)
     wJ = sqrt(p['mJ']/p['DJ'])
     wA = sqrt(p['mA']/p['DA'])
-    assert p['r']/p['K'] >= 1.
-    assert p['K']/p['r'] * (cosh(wJ*p['L1']) + wA/wJ * tanh(wA*p['d']) * sinh(wJ*p['L1'])) <= 1.
+    assert p['r'] >= 1.
+    assert 1./p['r'] * (cosh(wJ*p['L1']) + wA/wJ * tanh(wA*p['d']) * sinh(wJ*p['L1'])) <= 1.
     p.update(old_p)
 
 def consistency_condition(par='L1', p=p, extra_par={}):
     old_p = p.copy()
     p.update(extra_par)
-    check_consistency(p=p)
-    g = lambda x: G(0, p=p, extra_par={par: x}) - p['r']/p['K']
+#    check_consistency(p=p)
+    g = lambda x: G(0, p=p, extra_par={par: x}) - p['r']
     result = mp.findroot(g, p[par], solver='secant')
     p.update(old_p)
     return result
@@ -134,4 +154,3 @@ def f0(x, p=p, extra_par={}):
 
 if __name__ == '__main__':
     check_consistency()
-
