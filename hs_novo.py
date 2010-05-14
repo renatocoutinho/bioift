@@ -2,7 +2,7 @@
 from numpy import array, arange, vectorize, where
 #from numpy import exp, cosh, sinh, tanh, sqrt
 from sympy.mpmath import exp, cosh, sinh, tanh, sqrt, mpf, mpc
-from pylab import plot, show, legend, xlabel, ylabel
+from pylab import plot, show, legend, xlabel, ylabel, xlim, ylim, ion, ioff, clf
 import sympy.mpmath as mp
 from scipy import integrate
 
@@ -60,7 +60,11 @@ def A(x, p=p, extra_par={}):
 def intA(p=p, extra_par={}):
     old_p = p.copy()
     p.update(extra_par)
-    result = integrate.quad(lambda y: A(y, p=p), p["L1"], p["L1"]+p["d"])
+    wJ = sqrt((p['mJ'])/p['DJ'])
+    wA = sqrt((p['mA'])/p['DA'])
+    result = sinh(wA*p['d']) / wA / cosh(wA*p['d']) *\
+            (1/(cosh(wJ*p['L1']) + wA/wJ * tanh(wA*p['d']) *\
+            sinh(wJ*p['L1'])) - 1./(p['r']*p['d']*exp(-p['a']*p['L1'])))
     p.update(old_p)
     return result
 
@@ -72,14 +76,6 @@ def sol(x, p=p, extra_par={}):
     else:
         return A(x, p, extra_par)
 
-def Lcrit(p=p, extra_par={}):
-    old_p = p.copy()
-    p.update(extra_par)
-    f = lambda y: G(0, p=p, extra_par={'L1': y}) - p['r']
-    result = mp_solve(f, limits=[0., 10.])
-    p.update(old_p)
-    return result
-
 def check_consistency(p=p, extra_par={}):
     old_p = p.copy()
     p.update(extra_par)
@@ -89,11 +85,13 @@ def check_consistency(p=p, extra_par={}):
     assert 1./p['r'] * (cosh(wJ*p['L1']) + wA/wJ * tanh(wA*p['d']) * sinh(wJ*p['L1'])) <= 1.
     p.update(old_p)
 
-def consistency_condition(par='L1', p=p, extra_par={}):
+def critical_par(par='L1', p=p, extra_par={}):
     old_p = p.copy()
     p.update(extra_par)
-#    check_consistency(p=p)
-    g = lambda x: G(0, p=p, extra_par={par: x}) - p['r']
+    if par != 'r':
+        g = lambda x: G(0, p=p, extra_par={par: x}) - p['r']
+    else:
+        g = lambda x: G(0, p=p, extra_par={par: x}) - x
     result = mp.findroot(g, p[par], solver='secant')
     p.update(old_p)
     return result
