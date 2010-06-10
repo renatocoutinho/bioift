@@ -8,7 +8,6 @@ with boundary conditions
     -> J_x|_{x=L} = right
 """
 from numpy import *
-from pylab import plot, show, legend, xlabel, ylabel, ion, draw, figure, ylim
 from scipy.integrate import odeint
 
 class PDE():
@@ -83,6 +82,34 @@ def PDE_integrate(p, times, equation, grid_size):
     s.integrate(times)
     return s
 
+
+def animate(grid, data, labelx='x', labely='', labels=[]):
+    from pylab import plot, show, legend, xlabel, ylabel, ion, draw, figure, ylim
+    import time
+    
+    ion()
+    
+    tstart = time.time()               # for profiling
+    nvars = shape(data)[1]//len(grid)
+    ldata = [ data[:,i*len(grid):(i+1)*len(grid)] for i in range(nvars) ]
+    lines = []
+    for d in ldata:
+        lines.append(plot(grid, d[0])[0])
+    xlabel(labelx)
+    ylabel(labely)
+    if len(labels) == nvars:
+        legend(labels)
+    ymin = 0 if data.min() > 0 else floor(data.min())
+    ylim((ymin, ceil(data.max())))
+    for i in range(shape(data)[0]):
+        for l in range(len(lines)):
+            lines[l].set_ydata(ldata[l][i])  # update the data
+        draw()                         # redraw the canvas
+    
+    print 'FPS:' , shape(data)[0]/(time.time()-tstart)
+
+
+
 if __name__ == '__main__':
     p = {
         'r': 2.,        # r
@@ -92,10 +119,10 @@ if __name__ == '__main__':
         'D1': 1.,
         'D2': 1.,
         'c12': 0.1,
-        'c21': 0.9,
+        'c21': 1.3,
         'left': 0.,
         'right': 0.
         }
-    times = arange(0, 200, 1.)
+    times = arange(0, 50, 0.1)
     s = PDE_integrate(p, times, equation=PDE_fkpp_competitive, grid_size=200)
 
