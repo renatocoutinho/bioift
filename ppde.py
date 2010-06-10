@@ -75,12 +75,40 @@ class PDE_fkpp_competitive(PDE):
         self.y0 = concatenate((u0, v0))
 
 
-def PDE_integrate(p, times, equation, grid_size):
-    s = equation(**p)
-    s.set_grid(grid_size)
-    s.initialize(lambda x: 0.01*exp(-50*(x-s.L/2.)**2))
-    s.integrate(times)
-    return s
+class PDE_poliphenic(PDE):
+    '''Fisher-Kolmogorov equations for 2 competing populations.'''
+    def flux(self, y0, t):
+        N = zeros(len(y0)/3)
+        B = zeros(len(y0)/3)
+        M = zeros(len(y0)/3)
+        N0 = y0[:len(y0)/3]
+        B0 = y0[len(y0)/3:-len(y0)/3]
+        M0 = y0[-len(y0)/3:]
+        
+        N = self.r * (B0 + self.g*M0)  - self.s * N0
+        B = -self.mB * B0 + self.s / (1. + N0/self.K) * N0 * (1. - self.b0 * exp(N0-self.NL)/(1.+exp(N0-self.NL)))
+        M = -self.mM * M0 + self.s / (1. + N0/self.K) * N0 * self.b0 * exp(N0-self.NL)/(1.+exp(N0-self.NL))
+        
+        N[1:-1] += self.DN * (N0[2:] - 2*N0[1:-1] + N0[:-2])
+        N[0] += self.DN * (self.left -2*N0[0] + N0[1])
+        N[-1] += self.DN * (self.right -2*N0[-1] + N0[-2])
+
+        B[1:-1] += self.DB * (B0[2:] - 2*B0[1:-1] + B0[:-2])
+        B[0] += self.DB * (self.left -2*B0[0] + B0[1])
+        B[-1] += self.DB * (self.right -2*B0[-1] + B0[-2])
+        
+        M[1:-1] += self.DM * (M0[2:] - 2*M0[1:-1] + M0[:-2])
+        M[0] += self.DM * (self.left -2*M0[0] + M0[1])
+        M[-1] += self.DM * (self.right -2*M0[-1] + M0[-2])
+        
+        return concatenate((N, B, M))
+
+    def initialize(self, func):
+        N0 = fromfunction(lambda j: func((j+1)*self.dx), (self.grid_size-1,))
+        B0 = fromfunction(lambda j: func((j+1)*self.dx), (self.grid_size-1,))
+        M0 = fromfunction(lambda j: func((j+1)*self.dx), (self.grid_size-1,))
+        self.y0 = concatenate((N0, B0, M0))
+
 
 
 def animate(grid, data, labelx='x', labely='', labels=[]):
@@ -109,6 +137,16 @@ def animate(grid, data, labelx='x', labely='', labels=[]):
     print 'FPS:' , shape(data)[0]/(time.time()-tstart)
 
 
+def PDE_integrate(p, times, equation, grid_size):
+    s = equation(**p)
+    s.set_grid(grid_size)
+    gaussiano = lambda x: 0.1*exp(-500*(x-s.L/2.)**2)
+    quadrado = vectorize(lambda x: 0.1 if abs(x-s.L/2) < 0.2 else 0.)
+    s.initialize(quadrado)
+    s.integrate(times)
+    return s
+
+
 
 if __name__ == '__main__':
     p = {
@@ -123,6 +161,24 @@ if __name__ == '__main__':
         'left': 0.,
         'right': 0.
         }
-    times = arange(0, 50, 0.1)
-    s = PDE_integrate(p, times, equation=PDE_fkpp_competitive, grid_size=200)
+
+    p_pp = {
+            'r': 2.,
+            'L': 10.,
+            'K': 1.,
+            'DN': 0,
+            'DB': 0,
+            'DM': 0.1,
+            's': 0.7,
+            'g': 0.5,
+            'b0': 0.4,
+            'NL': 10,
+            'mB': 0.1,
+            'mM': 0.1,
+            'left': 0.,
+            'right': 0.
+            }
+    times = arange(0, 100, 1)
+    #s = PDE_integrate(p, times, equation=PDE_fkpp_competitive, grid_size=200)
+    s = PDE_integrate(p_pp, times, equation=PDE_poliphenic, grid_size=500)
 
