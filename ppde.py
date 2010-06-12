@@ -10,33 +10,27 @@ with boundary conditions
 from numpy import *
 from scipy.integrate import odeint
 
-class PDE():
+class PDE(object):
     '''Diffusion equation.'''
-    def __init__(self, dim=1, **kwargs):
+    def __init__(self, **kwargs):
         for (key, value) in kwargs.items():
             setattr(self, key, value)
-        self.dim = dim
 
     def set_grid(self, grid_size):
         self.grid_size = grid_size
         self.dx = self.L / (grid_size+1)
-        if self.dim == 1:
-            self.grid = arange(0, self.L, self.dx)
-            self.grid = self.grid[1:-1]
-
-    def initialize(self, func):
-        self.y0 = fromfunction(lambda j: func((j+1)*self.dx), (self.grid_size-1,))
+        self.grid = arange(0, self.L, self.dx)
+        self.grid = self.grid[1:-1]
 
     def DiffusiveTerm_1D(self, u):
-        y = zeros(len(u))
-        y[1:-1] = u[2:] - 2*u[1:-1] + u[:-2]
-        y[0] = self.left - 2*u[0] + u[1]
-        y[-1] = self.right - 2*u[-1] + u[-2]
+        y = -2 * u
+        y[1:-1] = u[2:] + u[:-2]
+        y[0] = self.left + u[1]
+        y[-1] = self.right + u[-2]
         return y/self.dx/self.dx
    
     def DiffusiveTerm_2D(self, u):
-        Nx, Ny = self.grid.shape
-        u2 = reshape(u, (Nx, Ny))
+        u2 = reshape(u, (self.grid_size-1, self.grid_size-1))
         y = -4*u2
         y[1:-1,:] += u2[0:-2,:] + u2[2:,:]
         y[:,1:-1] += u2[:,0:-2] + u2[:,2:]
@@ -44,20 +38,35 @@ class PDE():
         y[-1,:] += u2[-2,:] + self.bottom
         y[:,0] += u2[:,1] + self.left
         y[:,-1] += u2[:,-2] + self.right
-        return reshape(y, len(u))
+        return reshape(y, len(u))/self.dx/self.dx
+
+    def integrate(self, t):
+        self.data = odeint(self.flux, self.y0, t)
+
+    ## these methods/variables are specific to each problem
+    # number of spatial dimensions
+    dim = 1
 
     def flux(self, y0, t):
         y = self.D * self.DiffusiveTerm_1D(y0)
         return y
 
-    def integrate(self, t):
-        self.data = odeint(self.flux, self.y0, t)
+    def initialize(self, func):
+        self.y0 = fromfunction(func, self.dim*(self.grid_size-1,)).flatten()
 
 
 class PDE_fkpp(PDE):
     '''Fisher-Kolmogorov equation.'''
     def flux(self, y0, t):
         y = self.r * y0 * (1. - y0/self.K) + self.D * self.DiffusiveTerm_1D(y0)
+        return y
+
+
+class PDE_fkpp_2D(PDE):
+    '''Fisher-Kolmogorov equation.'''
+    dim = 2
+    def flux(self, y0, t):
+        y = self.r * y0 * (1. - y0/self.K) + self.D * self.DiffusiveTerm_2D(y0)
         return y
 
 
@@ -101,7 +110,7 @@ class PDE_polyphenic(PDE):
 
 
 def animate(grid, data, skip_frames=1, labelx='x', labely='', labels=[]):
-    from pylab import plot, show, legend, xlabel, ylabel, ion, draw, figure, ylim
+    from pylab import plot, legend, xlabel, ylabel, ion, draw, ylim
     import time
     
     ion()
@@ -126,28 +135,55 @@ def animate(grid, data, skip_frames=1, labelx='x', labely='', labels=[]):
     print 'FPS:' , shape(data)[0]/(time.time()-tstart)
 
 
+def animate_2D(grid, data, skip_frames=1, autoscale=False, labelx='x', labely='y', labels=[]):
+    from pylab import pcolor, colorbar, ion, xlabel, ylabel, draw
+    import time
+
+    ion()
+
+    tstart = time.time()               # for profiling
+    X,Y = meshgrid(grid, grid)
+    data = reshape(data, (data.shape[0], len(grid), len(grid)))
+    p = pcolor(X, Y, data[0], vmin=data.min(), vmax=data.max())
+    xlabel(labelx)
+    ylabel(labely)
+    colorbar()
+    for i in range(1, data.shape[0]):
+        p.set_array(data[i,0:-1,0:-1].ravel())
+        # rescale colors on each iteration. Useful if scale changes too much
+        if autoscale:
+            p.autoscale()
+        draw()
+
+    print 'FPS:' , shape(data)[0]/(time.time()-tstart)
+
 def PDE_integrate(p, times, equation, grid_size):
     s = equation(**p)
     s.set_grid(grid_size)
-    gaussiano = lambda x: 0.1*exp(-500*(x-s.L/2.)**2)
-    quadrado = vectorize(lambda x: 0.1 if abs(x-s.L/2) < 0.2 else 0.)
-    s.initialize(quadrado)
+    gaussiano = lambda i: 0.1*exp(-500*(i*s.dx-s.L/2.)**2)
+    quadrado = vectorize(lambda i: 0.1 if abs(i*s.dx-s.L/2) < 0.2 else 0.)
+    quadrado2d = vectorize(lambda i, j: 0.1 if abs(i*s.dx-s.L/2) < 0.2 and abs(j*s.dx-s.L/2) < 0.2 else 0.)
+    s.initialize(quadrado2d)
     s.integrate(times)
     return s
 
 
 if __name__ == '__main__':
     p = {
-        'r': 2.,        # r
-        'L': 1.,        # L
-        'K1': 1.,        # K
+        'r': 50.,
+        'L': 1.,
+        'K': 1.,
+        'D': 1.,
+        'K1': 1.,
         'K2': 1.,
         'D1': 1.,
         'D2': 1.,
         'c12': 0.1,
         'c21': 1.3,
         'left': 0.,
-        'right': 0.
+        'right': 0.,
+        'top': 0.,
+        'bottom': 0.
         }
 
     p_pp = {
@@ -167,8 +203,11 @@ if __name__ == '__main__':
         'left': 0.,
         'right': 0.
         }
-    times = arange(0, 100, 1)
+    times = arange(0, 0.2, 0.005)
     #s = PDE_integrate(p, times, equation=PDE_fkpp_competitive, grid_size=200)
-    s = PDE_integrate(p_pp, times, equation=PDE_polyphenic, grid_size=100)
-    animate(s.grid, s.data, labels=['N', 'B', 'M'])
+    #s = PDE_integrate(p_pp, times, equation=PDE_polyphenic, grid_size=100)
+    #animate(s.grid, s.data, labels=['N', 'B', 'M'])
+
+    s = PDE_integrate(p , times, equation=PDE_fkpp_2D, grid_size=50)
+    #animate_2D(s.grid, s.data)
 
