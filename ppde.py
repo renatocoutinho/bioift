@@ -24,9 +24,9 @@ class PDE(object):
 
     def DiffusiveTerm_1D(self, u):
         y = -2 * u
-        y[1:-1] = u[2:] + u[:-2]
-        y[0] = self.left + u[1]
-        y[-1] = self.right + u[-2]
+        y[1:-1] += u[2:] + u[:-2]
+        y[0] += self.left + u[1]
+        y[-1] += self.right + u[-2]
         return y/self.dx/self.dx
    
     def DiffusiveTerm_2D(self, u):
