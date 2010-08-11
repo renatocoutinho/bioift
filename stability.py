@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from itertools import permutations
 from sympy import *
 
 def fixed_points(eqs, x, assumps=[], positive=True):
@@ -7,26 +8,55 @@ def fixed_points(eqs, x, assumps=[], positive=True):
     def backsubs(y, ynew):
         return [ (v[0], simplify(v[1].subs([ynew]))) for v in y ] + [ ynew ]
 
-    def solve_step(eqs, step, y=[]):
+    def solve_step(eqs, xx, step, y=[]):
         if step == len(eqs):
+            y.sort(key=lambda x: x[0])
             results.append(y)
             return
         eq = eqs[step].subs(y)
-        ystep = solve(eq, x[step])
+        try:
+            ystep = solve(eq, xx[step])
+        except:
+            return
         for ynew in ystep:
-            solve_step(eqs, step+1, backsubs(y, (x[step], ynew)))
+            solve_step(eqs, xx, step+1, backsubs(y, (xx[step], ynew)))
     
     # do it
-    solve_step(eqs, 0)
+    for xx in permutations(x):
+        solve_step(eqs, xx, 0)
 
-    # try to verify positivity (or better, non-negativity)
-    if positive:
-        assumps = reduce(And, assumps) if assumps else True
-        for r in results:
+    results = unique(results, idfun=lambda x: tuple(x))
+
+    # try to verify solution and positivity (or better, non-negativity)
+    assumps = reduce(And, assumps) if assumps else True
+    for r in results:
+        if any([ simplify(eq.subs(r)) for eq in eqs ]):
+            results.remove(r)
+        if positive:
             for X in [ y[1] for y in r ]:
                 if ask(X, Q.negative, assumps):
                     results.remove(r)
     return results
+
+def unique(seq, idfun=None):
+    '''Returns list without repeats.
+
+    Source: http://www.peterbe.com/plog/uniqifiers-benchmark
+    '''
+    # order preserving
+    if idfun is None:
+        def idfun(x): return x
+    seen = {}
+    result = []
+    for item in seq:
+        marker = idfun(item)
+        # in old Python versions:
+        # if seen.has_key(marker)
+        # but in new ones:
+        if marker in seen: continue
+        seen[marker] = 1
+        result.append(item)
+    return result
 
 def jacob(eqs, x):
     return Matrix([ [ eq.diff(y) for y in x] for eq in eqs ])
@@ -89,7 +119,7 @@ def full_stability(eqs, x, assumps=[]):
     return result
 
 if __name__ == '__main__':
-    a,b,p,q = symbols('abpq', real=True)
+    a,b,c,p,q = symbols('abcpq', real=True)
     x,y,z = symbols('xyz', real=True)
     
 #    assumps = [ Assume(a, Q.positive),
@@ -98,9 +128,9 @@ if __name__ == '__main__':
 #                Assume(q, Q.positive)
 #                ]
     
-    eqs = [ x * (1 - x - y - z),
+    eqs = [ x * (1 - x - y - z/(c+x**2)),
             y * (-p + a*x),
-            z * (-q + b*x) ]
+            z * (-q + b*x/(c+x**2)) ]
     
-    f = full_stability(eqs, [x,y,z])
+    #f = full_stability(eqs, [x,y,z])
 
