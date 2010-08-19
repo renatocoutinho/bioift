@@ -1,41 +1,61 @@
 # -*- coding: utf-8 -*-
+import multiprocessing
 from itertools import permutations
 from sympy import *
 
-def fixed_points(eqs, x, assumps=[], positive=True):
-    # doing it the smart way
-    results = []
-    def backsubs(y, ynew):
-        return [ (v[0], simplify(v[1].subs([ynew]))) for v in y ] + [ ynew ]
+def backsubs(y, ynew):
+    return [ (v[0], simplify(v[1].subs([ynew]))) for v in y ] + [ ynew ]
 
-    def solve_step(eqs, xx, step, y=[]):
-        if step == len(eqs):
-            y.sort(key=lambda x: x[0])
-            results.append(y)
-            return
-        eq = eqs[step].subs(y)
-        try:
-            ystep = solve(eq, xx[step])
-        except:
-            return
-        for ynew in ystep:
-            solve_step(eqs, xx, step+1, backsubs(y, (xx[step], ynew)))
+def solve_step(eqs, xx, step, y=[]):
+    if step == len(eqs):
+        y.sort(key=lambda x: x[0])
+        if any([ v[1] < 0 for v in y ]):
+            return []
+        print y
+        return [ y ]
+    eq = eqs[step].subs(y)
+    try:
+        ystep = solve(eq, xx[step])
+    except:
+        return []
+    
+    result = []
+    for ynew in ystep:
+        r = solve_step(eqs, xx, step+1, backsubs(y, (xx[step], ynew)))
+        if r:
+            result += r
+    return result
+
+def fixed_points(eqs, x, assumps=[], positive=True, nroots=None, multi=None):
+    # doing it the smart way
+    eqs2 = [ eq.as_numer_denom()[0] for eq in eqs ]
+    #eqs_denom = [ eq.as_numer_denom()[1] for eq in eqs ]
+    #exclude = unique([ (v, solve(eq, v)) for v in x if v in eq.atoms(Symbol) for eq in eqs_denom ], idfun=tuple)
     
     # do it
-    for xx in permutations(x):
-        solve_step(eqs, xx, 0)
-
-    results = unique(results, idfun=lambda x: tuple(x))
+    if not multi:
+        for xx in permutations(x):
+            results += solve_step(eqs2, xx, 0)
+            results = unique(results, idfun=lambda x: tuple(x))
+            if nroots and len(results) >= nroots:
+                break
+    else:
+        # multiprocessing!
+        pool = multiprocessing.Pool(None)
+        results = []
+        r = pool.map_async(multi, permutations(x), callback=results.append)
+        r.wait() # Wait on the results
+        results = unique(results, idfun=lambda x: tuple(x))
 
     # try to verify solution and positivity (or better, non-negativity)
-    assumps = reduce(And, assumps) if assumps else True
-    for r in results:
-        if any([ simplify(eq.subs(r)) for eq in eqs ]):
-            results.remove(r)
-        if positive:
-            for X in [ y[1] for y in r ]:
-                if ask(X, Q.negative, assumps):
-                    results.remove(r)
+    #assumps = reduce(And, assumps) if assumps else True
+    #for r in results:
+    #    if any([ simplify(eq.subs(r)) for eq in eqs ]):
+    #        results.remove(r)
+    #    if positive:
+    #        for X in [ y[1] for y in r ]:
+    #            if ask(X, Q.negative, assumps):
+    #                results.remove(r)
     return results
 
 def unique(seq, idfun=None):
@@ -118,8 +138,9 @@ def full_stability(eqs, x, assumps=[]):
             result.append([p, e.keys()])
     return result
 
-if __name__ == '__main__':
-    a,b,c,p,q = symbols('abcpq', real=True)
+#if __name__ == '__main__':
+if True:
+    a,b,c,p,q,K,ay,az,dy,dz,by,bz,d = symbols(['a','b','c','p','q','K','ay','az','dy','dz','by','bz','d'], real=True)
     x,y,z = symbols('xyz', real=True)
     
 #    assumps = [ Assume(a, Q.positive),
@@ -132,5 +153,16 @@ if __name__ == '__main__':
             y * (-p + a*x),
             z * (-q + b*x/(c+x**2)) ]
     
+    eqs_IGP1 = [ x * (p*K - p*x - ay*y - az*z),
+                 y * (-dy + by*ay*x - c*z),
+                 z * (-dz + bz*az*x + d*c*y) ]
+    
+    eqs_IGP2 = [ x * (p*K - p*x - ay*y/(1+x) - az*z/(1+x)),
+                 y * (-dy + by*ay*x/(1+x) - c*z/(1+y)),
+                 z * (-dz + bz*az*x/(1+x) + d*c*y/(1+y)) ]
+ 
     #f = full_stability(eqs, [x,y,z])
-
+    eqs2 = [ eq.as_numer_denom()[0] for eq in eqs_IGP2 ]
+    def f(variables):
+        solve_step(eqs2, variables, 0)
+    print fixed_points(eqs_IGP1, [x,y,z], multi=f)
