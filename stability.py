@@ -32,6 +32,7 @@ def fixed_points(eqs, x, assumps=[], positive=True, nroots=None, multi=None):
     #eqs_denom = [ eq.as_numer_denom()[1] for eq in eqs ]
     #exclude = unique([ (v, solve(eq, v)) for v in x if v in eq.atoms(Symbol) for eq in eqs_denom ], idfun=tuple)
     
+    results = []
     # do it
     if not multi:
         for xx in permutations(x):
@@ -42,7 +43,6 @@ def fixed_points(eqs, x, assumps=[], positive=True, nroots=None, multi=None):
     else:
         # multiprocessing!
         pool = multiprocessing.Pool(None)
-        results = []
         r = pool.map_async(multi, permutations(x), callback=results.append)
         r.wait() # Wait on the results
         results = unique(results, idfun=lambda x: tuple(x))
@@ -162,7 +162,7 @@ if True:
                  z * (-dz + bz*az*x/(1+x) + d*c*y/(1+y)) ]
  
     #f = full_stability(eqs, [x,y,z])
-    eqs2 = [ eq.as_numer_denom()[0] for eq in eqs_IGP2 ]
+    eqs2 = [ eq.as_numer_denom()[0] for eq in eqs_IGP1 ]
     def f(variables):
         solve_step(eqs2, variables, 0)
-    print fixed_points(eqs_IGP1, [x,y,z], multi=f)
+    #print fixed_points(eqs_IGP1, [x,y,z], multi=f)
