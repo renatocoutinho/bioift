@@ -24,7 +24,14 @@ def solve_step(eqs, xx, step, y=[]):
     
     result = []
     for ynew in ystep:
-        r = solve_step(eqs, xx, step+1, backsubs(y, (xx[step], ynew)))
+        y_next = backsubs(y, (xx[step], ynew))
+        # discard NaN and Infinity
+        if any([ numbers.Infinity in map(type, yi[1].atoms()) or numbers.NaN in map(type, yi[1].atoms()) for yi in y_next ]):
+            continue
+        # discard negative solutions assuming all parameters positive
+        if any([ ask(yi[1], Q.negative, reduce(And, map(lambda q: Assume(q, Q.positive), list(yi[1].atoms(Symbol))))) for yi in y_next ]):
+            continue
+        r = solve_step(eqs, xx, step+1, y_next)
         if r:
             result += r
     return result
