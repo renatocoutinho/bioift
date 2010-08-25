@@ -3,6 +3,8 @@ import multiprocessing
 from itertools import permutations
 from sympy import *
 
+pprint_use_unicode(False)
+
 def backsubs(y, ynew):
     return [ (v[0], simplify(v[1].subs([ynew]))) for v in y ] + [ ynew ]
 
@@ -13,9 +15,10 @@ def solve_step(eqs, xx, step, y=[]):
             return []
         print y
         return [ y ]
-    eq = eqs[step].subs(y)
+    eq = eqs[step].subs(y).as_numer_denom()[0]
     try:
         ystep = solve(eq, xx[step])
+        print step, ystep
     except:
         return []
     
@@ -160,9 +163,24 @@ if True:
     eqs_IGP2 = [ x * (p*K - p*x - ay*y/(1+x) - az*z/(1+x)),
                  y * (-dy + by*ay*x/(1+x) - c*z/(1+y)),
                  z * (-dz + bz*az*x/(1+x) + d*c*y/(1+y)) ]
- 
+
+    w, m, pb, pp, pc, pd, zb, lb, lp, eb, ep = symbols(['w', 'm', 'pb', 'pp', 'pc', 'pd', 'zb', 'lb', 'lp', 'eb', 'ep'], real=True)
+    y = [ Symbol('y%s' % i, real=True) for i in range(6)]
+    eqs_coinf = [ w - m*y[0] - y[0]*y[4] - y[0]*y[5],
+                  lb*y[0]*y[4] - y[1] - eb*y[1]*y[5],
+                  y[0]*y[5] - pb*y[2] - ep*y[2]*y[4],
+                  eb*y[1]*y[5] + ep*y[2]*y[4] - pp*y[2]/lp - pd*y[5]/lp,
+                  y[1] - zb*y[2]/lp - pc*y[4] + pd*zb*y[5]/lp
+                  ]
+#                  eb*y[1]*y[5] + ep*y[2]*y[4] - pp*y[3],
+#                  y[1] + zb*y[3] - pc*y[4],
+#                  y[2] + lp*y[3] - pd*y[5]  ]
+
+
     #f = full_stability(eqs, [x,y,z])
+    
     eqs2 = [ eq.as_numer_denom()[0] for eq in eqs_IGP1 ]
     def f(variables):
         solve_step(eqs2, variables, 0)
     #print fixed_points(eqs_IGP1, [x,y,z], multi=f)
+
